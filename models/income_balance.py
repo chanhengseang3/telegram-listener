@@ -3,6 +3,16 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Generator, Any
 
+from sqlalchemy import (
+    Float,
+    String,
+    Column,
+    Integer,
+    DateTime,
+    BigInteger,
+    Text,
+    func,
+)
 import pytz as pytz
 from sqlalchemy import Float, String, Column, Integer, DateTime, BigInteger, Text
 from sqlalchemy.orm import Session
@@ -23,7 +33,7 @@ class CurrencyEnum(Enum):
 
 
 class IncomeBalance(Base):
-    __tablename__ = 'income_balance'
+    __tablename__ = "income_balance"
     id = Column(Integer, primary_key=True)
     amount = Column(Float, nullable=False)
     chat_id = Column(BigInteger, nullable=False)
@@ -47,10 +57,19 @@ class IncomeService:
         finally:
             db.close()
 
-    async def insert_income(self, chat_id: int, amount: float, currency: str, original_amount: float, message_id: int, message: str, trx_id: str) -> IncomeBalance:
+    async def insert_income(
+        self,
+        chat_id: int,
+        amount: float,
+        currency: str,
+        original_amount: float,
+        message_id: int,
+        message: str,
+        trx_id: str,
+    ) -> IncomeBalance:
         from_symbol = CurrencyEnum.from_symbol(currency)
         currency_code = from_symbol if from_symbol else currency
-        tz = pytz.timezone('Asia/Phnom_Penh')
+        tz = pytz.timezone("Asia/Phnom_Penh")
         current_date = datetime.now(tz)
 
         with self._get_db() as db:
@@ -63,7 +82,7 @@ class IncomeService:
                     original_amount=original_amount,
                     message_id=message_id,
                     message=message,
-                    trx_id=trx_id
+                    trx_id=trx_id,
                 )
 
                 db.add(new_income)
@@ -77,37 +96,49 @@ class IncomeService:
 
     async def get_income(self, income_id: int) -> Optional[IncomeBalance]:
         with self._get_db() as db:
-            return db.query(IncomeBalance).filter(
-                IncomeBalance.id == income_id
-            ).first()
+            return db.query(IncomeBalance).filter(IncomeBalance.id == income_id).first()
 
     async def get_income_by_chat_id(self, chat_id: int) -> list[type[IncomeBalance]]:
         with self._get_db() as db:
-            return db.query(IncomeBalance).filter(
-                IncomeBalance.chat_id == chat_id
-            ).all() #type: ignore
+            return (
+                db.query(IncomeBalance).filter(IncomeBalance.chat_id == chat_id).all()
+            )  # type: ignore
 
     async def get_income_by_message_id(self, message_id: int) -> bool:
         with self._get_db() as db:
-            return db.query(IncomeBalance).filter(
-                IncomeBalance.message_id == message_id
-            ).first() is not None
+            return (
+                db.query(IncomeBalance)
+                .filter(IncomeBalance.message_id == message_id)
+                .first()
+                is not None
+            )
 
     async def get_income_by_trx_id(self, trx_id) -> bool:
         with self._get_db() as db:
-            return db.query(IncomeBalance).filter(
-                IncomeBalance.trx_id == trx_id
-            ).first() is not None
+            return (
+                db.query(IncomeBalance).filter(IncomeBalance.trx_id == trx_id).first()
+                is not None
+            )
+
+    async def get_last_yesterday_message(self, date: datetime):
+        with self._get_db() as db:
+            return (
+                db.query(IncomeBalance)
+                .filter(func.date(IncomeBalance.income_date) == date.date())
+                .order_by(IncomeBalance.id.desc())
+                .first()
+            )
 
     async def get_income_by_date_and_chat_id(
-            self,
-            chat_id: int,
-            start_date: datetime,
-            end_date: datetime
+        self, chat_id: int, start_date: datetime, end_date: datetime
     ) -> list[type[IncomeBalance]]:
         with self._get_db() as db:
-            return db.query(IncomeBalance).filter(
-                IncomeBalance.chat_id == chat_id,
-                IncomeBalance.income_date >= start_date,
-                IncomeBalance.income_date < end_date
-            ).all() #type: ignore
+            return (
+                db.query(IncomeBalance)
+                .filter(
+                    IncomeBalance.chat_id == chat_id,
+                    IncomeBalance.income_date >= start_date,
+                    IncomeBalance.income_date < end_date,
+                )
+                .all()
+            )  # type: ignore

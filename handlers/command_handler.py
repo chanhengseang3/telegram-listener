@@ -5,33 +5,15 @@ from datetime import datetime, timedelta
 from telethon import Button
 
 from models import ConversationService, IncomeService, CurrencyEnum
+from telethon import Button
+from helper import total_summary_report
 
 
 class CommandHandler:
     @staticmethod
     def format_totals_message(period_text: str, incomes):
-        totals = {currency.name: 0 for currency in CurrencyEnum}
-        transaction_counts = {
-            "KHR": 0,
-            "USD": 0
-        }
-        
-        for income in incomes:
-            if income.currency in totals:
-                transaction_counts[income.currency] += 1
-                totals[income.currency] += income.amount
-            else:
-                totals[income.currency] = income.amount
-
-        message = f"សរុបប្រតិបត្តិការ {period_text}:\n\n"
-        for currency in CurrencyEnum:
-            code = currency.name
-            symbol = currency.value
-            total = totals.get(code, 0)
-            format_string = "{:,.0f}" if code == "KHR" else "{:,.2f}"
-            transaction_count = transaction_counts.get(code, 0)
-            message += f" ចំនួនប្រតិបត្តិការសរុប: {transaction_count}, ({code}): {format_string.format(total)}{symbol}\n"
-        return message
+        title = f"សរុបប្រតិបត្តិការ {period_text}"
+        return total_summary_report(incomes, title)
 
     async def handle_date_input_response(self, event, question):
         try:
@@ -47,29 +29,34 @@ class CommandHandler:
             if question.context_data:
                 context_data = json.loads(question.context_data)
 
-            current_month = context_data.get("current_month", datetime.now().strftime("%Y-%m"))
+            current_month = context_data.get(
+                "current_month", datetime.now().strftime("%Y-%m")
+            )
             date_str = f"{current_month}-{day:02d}"
 
             try:
                 selected_date = datetime.strptime(date_str, "%Y-%m-%d")
                 await conversation_service.mark_as_replied(
-                    chat_id=event.chat_id,
-                    message_id=question.message_id
+                    chat_id=event.chat_id, message_id=question.message_id
                 )
 
                 income_service = IncomeService()
                 incomes = await income_service.get_income_by_date_and_chat_id(
                     chat_id=event.chat_id,
                     start_date=selected_date,
-                    end_date=selected_date + timedelta(days=1)
+                    end_date=selected_date + timedelta(days=1),
                 )
 
                 await event.delete()
                 if not incomes:
-                    await event.respond(f"គ្មានប្រតិបត្តិការសម្រាប់ថ្ងៃទី {selected_date.strftime('%d %b %Y')} ទេ។")
+                    await event.respond(
+                        f"គ្មានប្រតិបត្តិការសម្រាប់ថ្ងៃទី {selected_date.strftime('%d %b %Y')} ទេ។"
+                    )
                     return
 
-                message = self.format_totals_message(f"ថ្ងៃទី {selected_date.strftime('%d %b %Y')}", incomes)
+                message = self.format_totals_message(
+                    f"ថ្ងៃទី {selected_date.strftime('%d %b %Y')}", incomes
+                )
                 await event.client.send_message(event.chat_id, message)
 
             except ValueError:
@@ -99,27 +86,29 @@ class CommandHandler:
     async def handle_weekly_summary(self, event):
         now = datetime.now()
         year, month = now.year, now.month
-        
-        first_day = datetime(year, month, 1)    
+
+        first_day = datetime(year, month, 1)
         days_to_monday = (first_day.weekday() - 0) % 7
         first_monday = first_day - timedelta(days=days_to_monday)
-        
+
         _, last_day = monthrange(year, month)
         last_date = datetime(year, month, last_day)
-        
+
         buttons = []
         current_monday = first_monday
-        
+
         while current_monday <= last_date:
             sunday = current_monday + timedelta(days=6)
             if current_monday.month != sunday.month:
                 label = f"{current_monday.strftime('%d %b')} - {sunday.strftime('%d %b %Y')}"
             else:
-                label = f"{current_monday.strftime('%d')} - {sunday.strftime('%d %b %Y')}"
-                
+                label = (
+                    f"{current_monday.strftime('%d')} - {sunday.strftime('%d %b %Y')}"
+                )
+
             callback_value = current_monday.strftime("%Y-%m-%d")
             buttons.append([Button.inline(label, f"summary_week_{callback_value}")])
-            
+
             current_monday += timedelta(days=7)
 
         buttons.append([Button.inline("ត្រឡប់ក្រោយ", "menu")])
@@ -144,7 +133,7 @@ class CommandHandler:
 
         result = await event.client.send_message(
             chat_id,
-            "ឆែករបាយការណ៍ថ្ងៃទី:\n\nសូមវាយថ្ងៃ (1-31) ជាការឆ្លើយតបសារនេះដោយប្រើប៊ូតុង 'Reply' ឬ 'ឆ្លើយតប'"
+            "ឆែករបាយការណ៍ថ្ងៃទី:\n\nសូមវាយថ្ងៃ (1-31) ជាការឆ្លើយតបសារនេះដោយប្រើប៊ូតុង 'Reply' ឬ 'ឆ្លើយតប'",
         )
 
         conversation_service = ConversationService()
@@ -154,7 +143,7 @@ class CommandHandler:
             chat_id=chat_id,
             message_id=result.id,
             question_type="date_input",
-            context_data=context_data
+            context_data=context_data,
         )
         await event.delete()
 
@@ -168,19 +157,23 @@ class CommandHandler:
             incomes = await income_service.get_income_by_date_and_chat_id(
                 chat_id=chat_id,
                 start_date=selected_date,
-                end_date=selected_date + timedelta(days=1)
+                end_date=selected_date + timedelta(days=1),
             )
 
-            await event.answer(f"Fetching data for {selected_date.strftime('%d %b %Y')}")
+            await event.answer(
+                f"Fetching data for {selected_date.strftime('%d %b %Y')}"
+            )
             await event.delete()
             if not incomes:
                 await event.client.send_message(
                     chat_id,
-                    f"គ្មានប្រតិបត្តិការសម្រាប់ថ្ងៃទី {selected_date.strftime('%d %b %Y')} ទេ។"
+                    f"គ្មានប្រតិបត្តិការសម្រាប់ថ្ងៃទី {selected_date.strftime('%d %b %Y')} ទេ។",
                 )
                 return
 
-            message = self.format_totals_message(f"ថ្ងៃទី {selected_date.strftime('%d %b %Y')}", incomes)
+            message = self.format_totals_message(
+                f"ថ្ងៃទី {selected_date.strftime('%d %b %Y')}", incomes
+            )
             await event.client.send_message(chat_id, message)
 
         except ValueError:
@@ -191,12 +184,17 @@ class CommandHandler:
 
         try:
             if data.startswith("summary_week_"):
-                start_date = datetime.strptime(data.replace("summary_week_", ""), "%Y-%m-%d")
+                start_date = datetime.strptime(
+                    data.replace("summary_week_", ""), "%Y-%m-%d"
+                )
                 end_date = start_date + timedelta(days=7)
                 period_text = f"{start_date.strftime('%d')} - {(end_date - timedelta(days=1)).strftime('%d %b %Y')}"
             elif data.startswith("summary_month_"):
-                start_date = datetime.strptime(data.replace("summary_month_", ""), "%Y-%m")
+                start_date = datetime.strptime(
+                    data.replace("summary_month_", ""), "%Y-%m"
+                )
                 from calendar import monthrange
+
                 _, last_day = monthrange(start_date.year, start_date.month)
                 end_date = start_date.replace(day=last_day) + timedelta(days=1)
                 period_text = start_date.strftime("%B %Y")
@@ -208,15 +206,12 @@ class CommandHandler:
             await event.delete()
             income_service = IncomeService()
             incomes = await income_service.get_income_by_date_and_chat_id(
-                chat_id=chat_id,
-                start_date=start_date,
-                end_date=end_date
+                chat_id=chat_id, start_date=start_date, end_date=end_date
             )
 
             if not incomes:
                 await event.client.send_message(
-                    chat_id,
-                    f"គ្មានប្រតិបត្តិការសម្រាប់ {period_text} ទេ។"
+                    chat_id, f"គ្មានប្រតិបត្តិការសម្រាប់ {period_text} ទេ។"
                 )
                 return
 
@@ -225,5 +220,3 @@ class CommandHandler:
 
         except ValueError:
             await event.client.send_message(chat_id, "ទម្រង់កាលបរិច្ឆេទមិនត្រឹមត្រូវ")
-
-

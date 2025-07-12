@@ -165,3 +165,100 @@ class ShiftService:
             ).distinct().order_by(Shift.shift_date.desc()).limit(days).all()
             
             return [d[0] for d in dates]
+
+    async def check_and_auto_close_shifts(self) -> list[Shift]:
+        """Check all open shifts and auto-close them based on configuration"""
+        from models.shift_configuration_model import ShiftConfigurationService
+        from datetime import datetime
+
+        closed_shifts = []
+        config_service = ShiftConfigurationService()
+        
+        with self._get_db() as db:
+            # Get all open shifts
+            open_shifts = db.query(Shift).filter(
+                Shift.is_closed == False
+            ).all()
+            
+            for shift in open_shifts:
+                config = await config_service.get_configuration(shift.chat_id)
+                if not config or not config.auto_close_enabled:
+                    continue
+                
+                should_close = False
+                current_time = DateUtils.now()
+                
+                # Check time-based auto close
+                if config.auto_close_time:
+                    # Convert time to datetime for comparison
+                    close_time = datetime.combine(
+                        current_time.date(), 
+                        config.auto_close_time
+                    )
+                    # Make timezone aware
+                    close_time = DateUtils.localize_datetime(close_time)
+                    
+                    # If current time is past the auto-close time and shift started before it
+                    shift_start = DateUtils.localize_datetime(shift.start_time)
+                    if current_time >= close_time and shift_start < close_time:
+                        should_close = True
+                
+                # Check inactivity-based auto close
+                if config.auto_close_after_hours and not should_close:
+                    hours_since_start = (current_time - DateUtils.localize_datetime(shift.start_time)).total_seconds() / 3600
+                    if hours_since_start >= config.auto_close_after_hours:
+                        should_close = True
+                
+                # Close the shift if needed
+                if should_close:
+                    shift.end_time = current_time
+                    shift.is_closed = True
+                    closed_shifts.append(shift)
+            
+            if closed_shifts:
+                db.commit()
+                for shift in closed_shifts:
+                    db.refresh(shift)
+        
+        return closed_shifts
+
+    async def auto_close_shift_for_chat(self, chat_id: int) -> Optional[Shift]:
+        """Auto close the current shift for a specific chat based on its configuration"""
+        from models.shift_configuration_model import ShiftConfigurationService
+        from datetime import datetime
+        
+        config_service = ShiftConfigurationService()
+        config = await config_service.get_configuration(chat_id)
+        
+        if not config or not config.auto_close_enabled:
+            return None
+        
+        current_shift = await self.get_current_shift(chat_id)
+        if not current_shift:
+            return None
+        
+        should_close = False
+        current_time = DateUtils.now()
+        
+        # Check time-based auto close
+        if config.auto_close_time:
+            close_time = datetime.combine(
+                current_time.date(), 
+                config.auto_close_time
+            )
+            close_time = DateUtils.localize_datetime(close_time)
+            
+            shift_start = DateUtils.localize_datetime(current_shift.start_time)
+            if current_time >= close_time and shift_start < close_time:
+                should_close = True
+        
+        # Check inactivity-based auto close
+        if config.auto_close_after_hours and not should_close:
+            hours_since_start = (current_time - DateUtils.localize_datetime(current_shift.start_time)).total_seconds() / 3600
+            if hours_since_start >= config.auto_close_after_hours:
+                should_close = True
+        
+        if should_close:
+            return await self.close_shift(current_shift.id)
+        
+        return None

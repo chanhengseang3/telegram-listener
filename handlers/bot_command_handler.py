@@ -1,7 +1,8 @@
 from telethon import Button
 
-from helper import DateUtils, force_log
 from common.enums import ServicePackage
+from helper import DateUtils, force_log
+from models import User
 from services import (
     ChatService,
     ConversationService,
@@ -9,7 +10,6 @@ from services import (
     UserService,
     GroupPackageService,
 )
-from models import User
 from .bot_event_handler import CommandHandler
 
 contact_message = "សូមទាក់ទងទៅអ្នកគ្រប់គ្រង: https://t.me/HK_688"
@@ -133,7 +133,8 @@ class EventHandler:
         )
         if telethon_message and not_added:
             # Create button to easily add @autosum_kh
-            buttons = [[Button.url("➕ Add @autosum_kh", f"https://t.me/autosum_kh")]]
+            buttons = [[Button.url("➕ Add @autosum_kh", f"https://t.me/autosum_kh")],
+                       [Button.url("Contact Admin", f"https://t.me/HK_688")]]
             await event.respond(telethon_message, buttons=buttons)
             return
 
@@ -142,7 +143,7 @@ class EventHandler:
             event.chat_id
         )
 
-        if group_package.package == ServicePackage.BASIC:
+        if group_package.package == ServicePackage.BASIC or group_package.package == ServicePackage.FREE:
             # Basic package: only current date option
             buttons = [
                 [Button.inline("ថ្ងៃនេះ", "current_date_summary")],

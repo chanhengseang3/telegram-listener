@@ -20,3 +20,4 @@ pyaes~=1.6.1
 platformdirs~=4.3.7
 Telethon~=1.40.0
 pytz
+schedule

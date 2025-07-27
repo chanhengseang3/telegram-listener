@@ -1,5 +1,6 @@
 import asyncio
 import os
+from datetime import timedelta
 
 import pytz
 from telethon import TelegramClient, events
@@ -65,31 +66,31 @@ class TelethonClientService:
             force_log(f"Error getting username by phone {phone_number}: {e}")
             return None
 
-    async def start(self, username, api_id, api_hash):
-        session_file = f"{username}.session"
+    async def start(self, mobile, api_id, api_hash):
+        session_file = f"{mobile}.session"
 
         # Handle persistent timestamp errors by removing corrupted session
         try:
-            self.client = TelegramClient(username, int(api_id), api_hash)
+            self.client = TelegramClient(mobile, int(api_id), api_hash)
             await self.client.connect()
-            await self.client.start(phone=username)  # type: ignore
-            force_log(f"Account {username} started...")
+            await self.client.start(phone=mobile)  # type: ignore
+            force_log(f"Account {mobile} started...")
         except PersistentTimestampInvalidError:
-            force_log(f"Session corrupted for {username}, removing session file...")
+            force_log(f"Session corrupted for {mobile}, removing session file...")
             if os.path.exists(session_file):
                 os.remove(session_file)
 
             # Recreate client with clean session
-            self.client = TelegramClient(username, int(api_id), api_hash)
+            self.client = TelegramClient(mobile, int(api_id), api_hash)
             await self.client.connect()
-            await self.client.start(phone=username)  # type: ignore
-            force_log(f"Account {username} restarted with clean session...")
+            await self.client.start(phone=mobile)  # type: ignore
+            force_log(f"Account {mobile} restarted with clean session...")
         except TimeoutError as e:
-            force_log(f"Connection timeout for {username}: {e}")
+            force_log(f"Connection timeout for {mobile}: {e}")
             force_log("Will retry connection automatically...")
             # Let Telethon handle automatic reconnection
         except Exception as e:
-            force_log(f"Error starting client for {username}: {e}")
+            force_log(f"Error starting client for {mobile}: {e}")
             raise
 
         # Add a startup log to confirm client is ready
@@ -118,9 +119,16 @@ class TelethonClientService:
                     force_log(f"Message from human user, ignoring")
                     return
 
-                # Ignore specific bot: AutosumBusinessBot
-                if getattr(sender, "username", "") == "AutosumBusinessBot":
-                    force_log(f"Message from AutosumBusinessBot, ignoring")
+                # Ignore specific bot
+                username = getattr(sender, "username", "") or ""
+
+                if username == "AutosumBusinessBot" or username == "AutoSum_bot":
+                    force_log(f"Message from Autosum, ignoring")
+                    return
+
+                lowercase_username = username.lower()
+                if "salmon" in lowercase_username or "report" in lowercase_username or "kambaul" in lowercase_username:
+                    force_log(f"Message from user with 'salmon/report/kambaul' in username ({username}), ignoring")
                     return
 
                 # Skip if no message text
@@ -179,13 +187,16 @@ class TelethonClientService:
                     chat_created = DateUtils.localize_datetime(chat_created)
                 chat_created_utc = chat_created.astimezone(pytz.UTC)
 
+                # Add a 5-minute buffer to handle any timestamp precision issues
+                chat_created_with_buffer = chat_created_utc - timedelta(minutes=5)
+                
                 force_log(
-                    f"Message time: {message_time}, Chat created: {chat_created_utc}"
+                    f"Message time: {message_time}, Chat created: {chat_created_utc} (with 5min buffer: {chat_created_with_buffer})"
                 )
-                # Ignore messages sent before chat registration
-                if message_time < chat_created_utc:
+                # Ignore messages sent before chat registration (with buffer)
+                if message_time < chat_created_with_buffer:
                     force_log(
-                        f"Ignoring message from {message_time} (before chat registration at {chat_created_utc})"
+                        f"Ignoring message from {message_time} (before chat registration buffer at {chat_created_with_buffer})"
                     )
                     return
 
@@ -206,6 +217,7 @@ class TelethonClientService:
                         trx_id,
                         0,  # shift_id
                         chat.enable_shift,  # enable_shift
+                        username,  # sent_by
                     )
                     force_log(
                         f"Successfully saved income record with id={result.id} for message {message_id}"

@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+from datetime import timedelta
 from typing import List
 
 import pytz
@@ -134,8 +135,16 @@ class MessageVerificationScheduler:
                     is_bot = getattr(sender, "bot", False)
 
                     if is_bot and message.text:
-                        # Skip AutosumBusinessBot messages
-                        if getattr(sender, "username", "") != "AutosumBusinessBot":
+
+                        username = getattr(sender, "username", "")
+
+                        lowercase_username = username.lower()
+                        if "salmon" in lowercase_username or "report" in lowercase_username or "kambaul" in lowercase_username:
+                            force_log(
+                                f"Message from user with 'salmon/report/kambaul' in username ({username}), ignoring")
+                            continue
+
+                        if username != "AutosumBusinessBot" and username != "AutoSum_bot":
                             messages.append(message)
                             force_log(
                                 f"Found bot message in timeframe: {message.id} from {message_time}"
@@ -197,9 +206,12 @@ class MessageVerificationScheduler:
                 chat_created = DateUtils.localize_datetime(chat_created)
             chat_created_utc = chat_created.astimezone(pytz.UTC)
 
-            if message_time < chat_created_utc:
+            # Add a 5-minute buffer to handle any timestamp precision issues
+            chat_created_with_buffer = chat_created_utc - timedelta(minutes=5)
+
+            if message_time < chat_created_with_buffer:
                 force_log(
-                    f"Message {message_id} timestamp {message_time} is before chat registration {chat_created_utc}, skipping"
+                    f"Message {message_id} timestamp {message_time} is before chat registration buffer {chat_created_with_buffer}, skipping"
                 )
                 return
 
@@ -237,6 +249,10 @@ class MessageVerificationScheduler:
             #     force_log(f"Duplicate transaction found for message {message_id}, skipping")
             #     return
 
+            # Get sender username
+            sender = await message.get_sender()
+            username = getattr(sender, "username", "") or ""
+            
             # Store the message as income
             force_log(f"Storing income for message {message_id}")
             result = await self.income_service.insert_income(
@@ -249,6 +265,7 @@ class MessageVerificationScheduler:
                 trx_id,
                 None,  # shift_id
                 chat.enable_shift,  # enable_shift
+                username,  # sent_by
             )
 
             force_log(

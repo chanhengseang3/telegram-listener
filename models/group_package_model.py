@@ -1,16 +1,19 @@
 from datetime import datetime
+
 from sqlalchemy import (
     Integer,
     Boolean,
     DateTime,
     ForeignKey,
     Enum,
+    Float,
+    Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from models.chat_model import Chat
-from models.base_model import BaseModel
 from common.enums import ServicePackage
+from models.base_model import BaseModel
+from models.chat_model import Chat
 
 
 class GroupPackage(BaseModel):
@@ -27,6 +30,8 @@ class GroupPackage(BaseModel):
     package_start_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     package_end_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_paid_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    amount_paid: Mapped[float | None] = mapped_column(Float, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # One-to-one relationship with chat_group
     chat_group: Mapped[Chat] = relationship(

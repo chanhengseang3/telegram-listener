@@ -39,6 +39,7 @@ class GroupPackageService:
                 chat_group_id=chat_group_id,
                 package=package,
                 is_paid=False if package in [ServicePackage.TRIAL, ServicePackage.FREE] else True,
+                package_start_date=DateUtils.now(),
                 created_at=DateUtils.now(),
                 updated_at=DateUtils.now(),
             )
@@ -58,6 +59,8 @@ class GroupPackageService:
         package: ServicePackage,
         package_start_date: datetime | None = None,
         package_end_date: datetime | None = None,
+        amount_paid: float | None = None,
+        note: str | None = None,
         last_paid_date: datetime | None = None,
     ) -> GroupPackage | None:
         chat_group_id = await self._get_chat_group_id_by_chat_id(chat_id)
@@ -81,6 +84,10 @@ class GroupPackageService:
                     group_package.package_start_date = package_start_date
                 if package_end_date:
                     group_package.package_end_date = package_end_date
+                if amount_paid is not None:
+                    group_package.amount_paid = amount_paid
+                if note is not None:
+                    group_package.note = note
                 if last_paid_date:
                     group_package.last_paid_date = last_paid_date
 

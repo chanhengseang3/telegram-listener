@@ -9,6 +9,7 @@ from alembic.config import Config
 from config import load_environment
 from helper.credential_loader import CredentialLoader
 from schedulers import AutoCloseScheduler
+from schedulers.trial_expiry_scheduler import TrialExpiryScheduler
 from services.autosum_business_bot_service import AutosumBusinessBot
 from services.telegram_admin_bot_service import TelegramAdminBot
 from services.telegram_bot_service import TelegramBotService
@@ -69,6 +70,7 @@ async def main(loader: CredentialLoader) -> None:
         admin_bot = TelegramAdminBot(loader.admin_bot_token)
         business_bot = AutosumBusinessBot(loader.autosum_business_bot_token)
         auto_close_scheduler = AutoCloseScheduler(bot_service=business_bot)
+        trial_expiry_scheduler = TrialExpiryScheduler()
 
         alembic_cfg = Config("alembic.ini")
         command.upgrade(alembic_cfg, "head")
@@ -89,6 +91,7 @@ async def main(loader: CredentialLoader) -> None:
             ),
             asyncio.create_task(admin_bot.start_polling()),
             asyncio.create_task(auto_close_scheduler.start_scheduler()),
+            asyncio.create_task(trial_expiry_scheduler.start_scheduler()),
         ]
 
         # Add business bot only if token is provided

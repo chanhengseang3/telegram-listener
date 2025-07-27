@@ -2,13 +2,12 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
+from common.enums import CurrencyEnum
+from config import get_db_session
 from helper import DateUtils
 from helper.logger_utils import force_log
 from models import IncomeBalance
 from .shift_service import ShiftService
-from common.enums import CurrencyEnum
-
-from config import get_db_session
 
 
 class IncomeService:
@@ -64,6 +63,7 @@ class IncomeService:
         trx_id: str | None,
         shift_id: int = 0,
         enable_shift: bool = False,
+        sent_by: str | None = None,
     ) -> IncomeBalance:
         """
         Insert income
@@ -103,6 +103,7 @@ class IncomeService:
                         message=message,
                         trx_id=trx_id,
                         shift_id=shift_id if shift_id != 0 else None,
+                        sent_by=sent_by,
                     )
 
                     db.add(new_income)

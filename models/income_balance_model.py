@@ -1,5 +1,5 @@
-from datetime import datetime
 import typing
+from datetime import datetime
 
 if typing.TYPE_CHECKING:
     from models.shift_model import Shift
@@ -37,3 +37,4 @@ class IncomeBalance(BaseModel):
     )
     shift: Mapped["Shift"] = relationship("Shift", back_populates="income_records")
     trx_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sent_by: Mapped[str | None] = mapped_column(String(50), nullable=True)

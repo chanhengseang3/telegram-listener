@@ -42,6 +42,40 @@ class IncomeService:
                 return income.first()
             return None
 
+    async def update_note(self, message_id: int, chat_id: int, note: str) -> bool:
+        """Update the note for a transaction by message_id and chat_id"""
+        try:
+            with get_db_session() as db:
+                income = db.query(IncomeBalance).filter(
+                    IncomeBalance.message_id == message_id,
+                    IncomeBalance.chat_id == chat_id
+                ).first()
+                
+                if income:
+                    income.note = note
+                    db.commit()
+                    force_log(f"Updated note for transaction {income.id} in chat {chat_id}: {note}")
+                    return True
+                else:
+                    force_log(f"No transaction found with message_id {message_id} in chat {chat_id}")
+                    return False
+                    
+        except Exception as e:
+            force_log(f"Error updating note: {e}")
+            return False
+
+    async def get_income_by_message_id(self, message_id: int, chat_id: int) -> IncomeBalance | None:
+        """Get income record by message_id and chat_id"""
+        try:
+            with get_db_session() as db:
+                return db.query(IncomeBalance).filter(
+                    IncomeBalance.message_id == message_id,
+                    IncomeBalance.chat_id == chat_id
+                ).first()
+        except Exception as e:
+            force_log(f"Error getting income by message_id: {e}")
+            return None
+
     async def get_last_shift_id(self, chat_id: int) -> IncomeBalance | None:
         with get_db_session() as db:
             last_income = (

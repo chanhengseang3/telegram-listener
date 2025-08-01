@@ -8,6 +8,8 @@ from telegram.ext import (
     Application,
     ConversationHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 
 from common.enums import ServicePackage
@@ -39,6 +41,46 @@ class AutosumBusinessBot:
         self.event_handler = BusinessEventHandler()
         self.group_package_service = GroupPackageService()
         force_log("AutosumBusinessBot initialized with token", "AutosumBusinessBot")
+
+    async def handle_reply_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle reply messages for transaction annotations"""
+        try:
+            # Check if this is a reply message
+            if update.message.reply_to_message:
+                # Get the original message that is being replied to
+                original_message = update.message.reply_to_message
+                
+                # Check if the original message is from a bot (bank bot)
+                if original_message.from_user and original_message.from_user.is_bot:
+                    # Check if this original message exists in our income_balance table
+                    from services.income_balance_service import IncomeService
+                    income_service = IncomeService()
+                    
+                    income_record = await income_service.get_income_by_message_id(
+                        original_message.message_id, update.effective_chat.id
+                    )
+                    
+                    if income_record:
+                        # Save the reply text as annotation
+                        note = update.message.text or update.message.caption or ""
+                        if note.strip():  # Only save non-empty notes
+                            success = await income_service.update_note(
+                                original_message.message_id, update.effective_chat.id, note
+                            )
+                            if success:
+                                force_log(f"Added note to transaction {income_record.id}: {note[:50]}...")
+                                # Send a confirmation message
+                                await update.message.reply_text(
+                                    f"✅ Note added to transaction: {note[:100]}{'...' if len(note) > 100 else ''}"
+                                )
+                            else:
+                                force_log(f"Failed to add note to message_id {original_message.message_id}")
+                    else:
+                        force_log(f"Reply to bot message {original_message.message_id} but no transaction found in DB")
+                
+        except Exception as e:
+            force_log(f"Error in handle_reply_message: {e}")
+            # Don't respond with error for reply handler to avoid spam
 
     def _convert_buttons_to_keyboard(self, buttons):
         """Convert tuple buttons to InlineKeyboardButton objects"""
@@ -489,6 +531,9 @@ class AutosumBusinessBot:
         self.app.add_handler(CommandHandler("support", self.business_support))
         self.app.add_handler(CommandHandler("register", self.register_chat))
         self.app.add_handler(CommandHandler("shift", self.enable_shift))
+        
+        # Reply message handler for transaction annotations
+        self.app.add_handler(MessageHandler(filters.REPLY & ~filters.COMMAND, self.handle_reply_message))
 
         # Business menu conversation handler
         business_menu_handler = ConversationHandler(

@@ -38,3 +38,4 @@ class IncomeBalance(BaseModel):
     shift: Mapped["Shift"] = relationship("Shift", back_populates="income_records")
     trx_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     sent_by: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)

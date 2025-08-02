@@ -159,9 +159,32 @@ class AutosumBusinessBot:
                         # Re-raise other exceptions
                         raise e
 
-            async def respond(self, message, buttons=None):
-                # For callback events, we should edit instead of respond
-                await self.edit(message, buttons)
+            async def delete(self):
+                """Delete the current message"""
+                try:
+                    await self.query.message.delete()
+                except Exception as e:
+                    force_log(f"Error deleting message in chat {self.chat_id}: {e}")
+
+            async def respond(self, message, buttons=None, parse_mode=None):
+                """Send a new message with optional HTML parsing"""
+                keyboard = (
+                    self.parent._convert_buttons_to_keyboard(buttons)
+                    if buttons
+                    else None
+                )
+                try:
+                    await self.parent.app.bot.send_message(
+                        chat_id=self.chat_id,
+                        text=message,
+                        reply_markup=keyboard,
+                        parse_mode=parse_mode
+                    )
+                    # Answer the callback to remove loading state
+                    await self.query.answer()
+                except Exception as e:
+                    force_log(f"Error responding to chat {self.chat_id}: {e}")
+                    raise e
 
             async def get_sender(self):
                 return query.from_user

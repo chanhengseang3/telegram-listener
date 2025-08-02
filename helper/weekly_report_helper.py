@@ -28,7 +28,13 @@ def weekly_transaction_report(incomes, start_date: datetime, end_date: datetime)
     
     # Format date range for title
     start_day = start_date.day
-    end_day = end_date.day - 1  # Subtract 1 since end_date is exclusive
+    # Check if end_date is exclusive (00:00:00) or inclusive (23:59:59)
+    if end_date.hour == 0 and end_date.minute == 0 and end_date.second == 0:
+        # Standard bot format: end_date is exclusive (next day)
+        end_day = end_date.day - 1
+    else:
+        # Business bot format: end_date is inclusive (23:59:59 of actual end day)
+        end_day = end_date.day
     month_khmer = get_khmer_month_name(end_date.month)
     year = end_date.year
     

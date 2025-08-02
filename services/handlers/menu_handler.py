@@ -109,7 +109,8 @@ class MenuHandler:
                 
                 # Use daily report format for current date
                 from helper import daily_transaction_report
-                message = daily_transaction_report(incomes, current_date, telegram_username)
+                group_name = chat.group_name or f"Group {chat.chat_id}"
+                message = daily_transaction_report(incomes, current_date, telegram_username, group_name)
 
             await query.edit_message_text(message, parse_mode='HTML')
             return True
@@ -173,11 +174,20 @@ class MenuHandler:
             year = now.year
             keyboard = []
             
-            for month in range(1, 13):
-                month_date = datetime(year, month, 1)
-                label = month_date.strftime("%B %Y")
-                callback_value = month_date.strftime("%Y-%m")
-                keyboard.append([InlineKeyboardButton(label, callback_data=f"summary_month_{callback_value}")])
+            for month in range(1, 13, 2):
+                month_date_1 = datetime(year, month, 1)
+                label_1 = month_date_1.strftime("%B %Y")
+                callback_value_1 = month_date_1.strftime("%Y-%m")
+                
+                row = [InlineKeyboardButton(label_1, callback_data=f"summary_month_{callback_value_1}")]
+                
+                if month + 1 <= 12:
+                    month_date_2 = datetime(year, month + 1, 1)
+                    label_2 = month_date_2.strftime("%B %Y")
+                    callback_value_2 = month_date_2.strftime("%Y-%m")
+                    row.append(InlineKeyboardButton(label_2, callback_data=f"summary_month_{callback_value_2}"))
+                
+                keyboard.append(row)
             
             keyboard.append([InlineKeyboardButton("ត្រឡប់ក្រោយ", callback_data="menu")])
             
@@ -241,8 +251,7 @@ class MenuHandler:
             )
             return False
 
-    @staticmethod
-    async def _handle_date_summary(chat_id: int, callback_data: str, query):
+    async def _handle_date_summary(self, chat_id: int, callback_data: str, query):
         """Handle date summary like normal bot"""
         try:
             date_str = callback_data.replace("summary_of_", "")
@@ -269,10 +278,14 @@ class MenuHandler:
                         telegram_username = requesting_user.first_name
                     # If user is anonymous, username will remain "Admin"
                 
+                # Get chat object for group name
+                chat = await self.chat_service.get_chat_by_chat_id(chat_id)
+                group_name = chat.group_name or f"Group {chat.chat_id}" if chat else None
+                
                 # Use new daily report format
                 start_date = selected_date
                 end_date = selected_date + timedelta(days=1)
-                message = daily_transaction_report(incomes, selected_date, telegram_username)
+                message = daily_transaction_report(incomes, selected_date, telegram_username, group_name)
 
             await query.edit_message_text(message, parse_mode='HTML')
             return True
@@ -492,8 +505,7 @@ class MenuHandler:
             await query.edit_message_text(f"Error generating month summary: {str(e)}")
             return False
 
-    @staticmethod
-    async def _generate_report(chat_id: int, report_type: str, requesting_user=None) -> str:
+    async def _generate_report(self, chat_id: int, report_type: str, requesting_user=None) -> str:
         """Generate report text by calling appropriate service methods"""
 
         income_service = IncomeService()
@@ -549,7 +561,11 @@ class MenuHandler:
                     telegram_username = requesting_user.first_name
                 # If user is anonymous, username will remain "Admin"
             
-            return daily_transaction_report(incomes, now, telegram_username)
+            # Get chat object for group name
+            chat = await self.chat_service.get_chat_by_chat_id(chat_id)
+            group_name = chat.group_name or f"Group {chat.chat_id}" if chat else None
+            
+            return daily_transaction_report(incomes, now, telegram_username, group_name)
         elif report_type == "weekly":
             # Use the new weekly format
             return weekly_transaction_report(incomes, start_date, end_date)

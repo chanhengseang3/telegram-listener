@@ -274,11 +274,20 @@ class CommandHandler:
         year = now.year
         buttons = []
 
-        for month in range(1, 13):
-            month_date = datetime(year, month, 1)
-            label = month_date.strftime("%B %Y")
-            callback_value = month_date.strftime("%Y-%m")
-            buttons.append([Button.inline(label, f"summary_month_{callback_value}")])
+        for month in range(1, 13, 2):
+            month_date_1 = datetime(year, month, 1)
+            label_1 = month_date_1.strftime("%B %Y")
+            callback_value_1 = month_date_1.strftime("%Y-%m")
+            
+            row = [Button.inline(label_1, f"summary_month_{callback_value_1}")]
+            
+            if month + 1 <= 12:
+                month_date_2 = datetime(year, month + 1, 1)
+                label_2 = month_date_2.strftime("%B %Y")
+                callback_value_2 = month_date_2.strftime("%Y-%m")
+                row.append(Button.inline(label_2, f"summary_month_{callback_value_2}"))
+            
+            buttons.append(row)
 
         buttons.append([Button.inline("ត្រឡប់ក្រោយ", "menu")])
         await event.edit("ជ្រើសរើសខែ:", buttons=buttons)

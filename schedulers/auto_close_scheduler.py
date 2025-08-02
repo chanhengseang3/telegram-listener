@@ -2,7 +2,7 @@ import asyncio
 
 from helper.logger_utils import force_log
 from services import ShiftService
-from services.autosum_business_bot_service import AutosumBusinessBot
+from services.telegram_business_bot_service import AutosumBusinessBot
 
 
 class AutoCloseScheduler:
